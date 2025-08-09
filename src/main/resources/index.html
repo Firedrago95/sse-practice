@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>실시간 주문 상태 추적</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+    }
+    /* 상태별 활성화 스타일 */
+    .status-item.active .status-icon {
+      background-color: #3b82f6; /* bg-blue-500 */
+      color: white;
+    }
+    .status-item.active .status-text {
+      color: #1e3a8a; /* text-blue-900 */
+      font-weight: 700;
+    }
+    .status-item.completed .status-icon {
+      background-color: #22c55e; /* bg-green-500 */
+      color: white;
+    }
+    .status-item.completed .status-text {
+      color: #166534; /* text-green-800 */
+      font-weight: 500;
+    }
+    /* 상태바 진행 효과 */
+    .progress-bar-fill {
+      transition: width 0.5s ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+<div class="w-full max-w-2xl mx-auto bg-white rounded-2xl shadow-lg p-8">
+  <header class="text-center mb-8">
+    <h1 class="text-3xl font-bold text-gray-800">실시간 주문 현황 🍔</h1>
+    <p id="connection-status" class="text-sm text-gray-500 mt-2">서버에 연결 중...</p>
+  </header>
+
+  <!-- 주문 상태 표시 -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between">
+      <div id="status-ORDER_RECEIVED" class="status-item text-center">
+        <div class="status-icon relative mx-auto w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-xl text-gray-600">📝</div>
+        <p class="status-text mt-2 text-sm text-gray-600">주문 접수</p>
+      </div>
+      <div id="status-COOKING" class="status-item text-center">
+        <div class="status-icon relative mx-auto w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-xl text-gray-600">🍳</div>
+        <p class="status-text mt-2 text-sm text-gray-600">조리 중</p>
+      </div>
+      <div id="status-OUT_FOR_DELIVERY" class="status-item text-center">
+        <div class="status-icon relative mx-auto w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-xl text-gray-600">🛵</div>
+        <p class="status-text mt-2 text-sm text-gray-600">배달 중</p>
+      </div>
+      <div id="status-DELIVERED" class="status-item text-center">
+        <div class="status-icon relative mx-auto w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-xl text-gray-600">🏠</div>
+        <p class="status-text mt-2 text-sm text-gray-600">배달 완료</p>
+      </div>
+    </div>
+    <!-- 진행 바 -->
+    <div class="w-full bg-gray-200 rounded-full h-2.5 mt-4">
+      <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full progress-bar-fill" style="width: 0%"></div>
+    </div>
+  </div>
+
+  <!-- 이벤트 로그 -->
+  <div class="bg-gray-50 rounded-lg p-4 h-48 overflow-y-auto">
+    <h2 class="text-lg font-semibold text-gray-700 mb-2">서버 이벤트 로그</h2>
+    <div id="log-container">
+      <p class="text-sm text-gray-500">수신된 이벤트가 여기에 표시됩니다.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // --- 설정 ---
+  // 스프링 부트 백엔드의 SSE 엔드포인트 URL을 입력하세요.
+  const SSE_ENDPOINT = "/sse/connect";
+  // ----------------
+
+  const connectionStatus = document.getElementById('connection-status');
+  const logContainer = document.getElementById('log-container');
+  const progressBar = document.getElementById('progress-bar');
+  const statuses = ['ORDER_RECEIVED', 'COOKING', 'OUT_FOR_DELIVERY', 'DELIVERED'];
+
+  // 로그 메시지를 화면에 추가하는 함수
+  function logMessage(message, type = 'info') {
+    const p = document.createElement('p');
+    const now = new Date();
+    const timestamp = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+
+    p.textContent = `[${timestamp}] ${message}`;
+
+    if (type === 'error') {
+      p.className = 'text-sm text-red-600';
+    } else if (type === 'success') {
+      p.className = 'text-sm text-green-600';
+    } else {
+      p.className = 'text-sm text-gray-800';
+    }
+
+    // 초기 메시지 제거
+    if (logContainer.childElementCount === 1 && logContainer.firstChild.textContent.includes('수신된 이벤트')) {
+      logContainer.innerHTML = '';
+    }
+
+    logContainer.prepend(p);
+  }
+
+  // 상태 UI를 업데이트하는 함수
+  function updateStatusUI(currentStatus) {
+    let currentStatusIndex = -1;
+
+    statuses.forEach((status, index) => {
+      const element = document.getElementById(`status-${status}`);
+      element.classList.remove('active', 'completed');
+
+      if (status === currentStatus) {
+        element.classList.add('active');
+        currentStatusIndex = index;
+      }
+    });
+
+    // 이전 단계들은 'completed'로 표시
+    for (let i = 0; i < currentStatusIndex; i++) {
+      const element = document.getElementById(`status-${statuses[i]}`);
+      element.classList.add('completed');
+    }
+
+    // 프로그레스 바 업데이트
+    let progressPercentage = 0;
+    if (currentStatusIndex >= 0) {
+      if (currentStatusIndex === statuses.length - 1) { // 배달 완료
+        progressPercentage = 100;
+        progressBar.classList.remove('bg-blue-600');
+        progressBar.classList.add('bg-green-500');
+      } else {
+        progressPercentage = (currentStatusIndex / (statuses.length - 1)) * 100;
+        progressBar.classList.remove('bg-green-500');
+        progressBar.classList.add('bg-blue-600');
+      }
+    }
+    progressBar.style.width = `${progressPercentage}%`;
+  }
+
+
+  // EventSource 연결 설정
+  const eventSource = new EventSource(SSE_ENDPOINT);
+
+  // 연결 성공 시
+  eventSource.onopen = function() {
+    connectionStatus.textContent = '✅ 서버에 성공적으로 연결되었습니다.';
+    connectionStatus.className = 'text-sm text-green-600 font-semibold';
+    logMessage('SSE 연결이 시작되었습니다.', 'success');
+  };
+
+  // 서버로부터 메시지 수신 시 (기본 'message' 이벤트)
+  eventSource.onmessage = function(event) {
+    const statusData = event.data;
+    logMessage(`수신된 데이터: ${statusData}`);
+
+    if (statuses.includes(statusData)) {
+      updateStatusUI(statusData);
+    } else {
+      logMessage(`알 수 없는 상태 값: ${statusData}`, 'error');
+    }
+  };
+
+  // 'customEvent'라는 이름의 커스텀 이벤트 수신 시 (연습용)
+  eventSource.addEventListener('customEvent', function(event) {
+    const eventData = JSON.parse(event.data);
+    logMessage(`커스텀 이벤트 '${event.type}' 수신: ${JSON.stringify(eventData)}`);
+  });
+
+  // 연결 오류 발생 시
+  eventSource.onerror = function(err) {
+    connectionStatus.textContent = '❌ 서버 연결이 끊어졌습니다. 재연결을 시도합니다...';
+    connectionStatus.className = 'text-sm text-red-600 font-semibold';
+    logMessage('SSE 연결 오류가 발생했습니다. 5초 후 재연결됩니다.', 'error');
+    // EventSource는 자동으로 5초 정도 후에 재연결을 시도합니다.
+    // 필요하다면 여기서 eventSource.close()를 호출하여 재연결을 막을 수 있습니다.
+  };
+
+  // 초기 상태 설정
+  updateStatusUI('');
+</script>
+</body>
+</html>
