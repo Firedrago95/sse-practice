@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>실시간 주문 상태 추적</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+<div class="w-full max-w-2xl mx-auto bg-white rounded-2xl shadow-lg p-8">
+  <header class="text-center mb-8">
+    <h1 class="text-3xl font-bold text-gray-800">실시간 주문 현황 🍔</h1>
+    <p id="connection-status" class="text-sm text-gray-500 mt-2">서버에 연결 중...</p>
+  </header>
+
+  <!-- 주문 상태 표시 -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between">
+      <div id="status-ORDER_RECEIVED" class="status-item text-center">
+        <div class="status-icon relative mx-auto w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-xl text-gray-600">📝</div>
+        <p class="status-text mt-2 text-sm text-gray-600">주문 접수</p>
+      </div>
+      <div id="status-COOKING" class="status-item text-center">
+        <div class="status-icon relative mx-auto w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-xl text-gray-600">🍳</div>
+        <p class="status-text mt-2 text-sm text-gray-600">조리 중</p>
+      </div>
+      <div id="status-OUT_FOR_DELIVERY" class="status-item text-center">
+        <div class="status-icon relative mx-auto w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-xl text-gray-600">🛵</div>
+        <p class="status-text mt-2 text-sm text-gray-600">배달 중</p>
+      </div>
+      <div id="status-DELIVERED" class="status-item text-center">
+        <div class="status-icon relative mx-auto w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-xl text-gray-600">🏠</div>
+        <p class="status-text mt-2 text-sm text-gray-600">배달 완료</p>
+      </div>
+    </div>
+    <!-- 진행 바 -->
+    <div class="w-full bg-gray-200 rounded-full h-2.5 mt-4">
+      <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full progress-bar-fill" style="width: 0%"></div>
+    </div>
+  </div>
+
+  <!-- 이벤트 로그 -->
+  <div class="bg-gray-50 rounded-lg p-4 h-48 overflow-y-auto">
+    <h2 class="text-lg font-semibold text-gray-700 mb-2">서버 이벤트 로그</h2>
+    <div id="log-container">
+      <p class="text-sm text-gray-500">수신된 이벤트가 여기에 표시됩니다.</p>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

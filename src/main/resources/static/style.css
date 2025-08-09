@@ -1,0 +1,24 @@
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+}
+/* 상태별 활성화 스타일 */
+.status-item.active .status-icon {
+  background-color: #3b82f6; /* bg-blue-500 */
+  color: white;
+}
+.status-item.active .status-text {
+  color: #1e3a8a; /* text-blue-900 */
+  font-weight: 700;
+}
+.status-item.completed .status-icon {
+  background-color: #22c55e; /* bg-green-500 */
+  color: white;
+}
+.status-item.completed .status-text {
+  color: #166534; /* text-green-800 */
+  font-weight: 500;
+}
+/* 상태바 진행 효과 */
+.progress-bar-fill {
+  transition: width 0.5s ease-in-out;
+}
