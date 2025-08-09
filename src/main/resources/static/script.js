@@ -1,7 +1,12 @@
 // --- 설정 ---
-// 스프링 부트 백엔드의 SSE 엔드포인트 URL을 입력하세요.
-const SSE_ENDPOINT = "/sse/connect";
+const SSE_ENDPOINT_BASE = "/sse/connect";
 // ----------------
+
+// 고유 사용자 ID 생성 (페이지 새로고침 시마다 변경)
+const userId = "user-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9);
+const SSE_ENDPOINT = `${SSE_ENDPOINT_BASE}?userId=${userId}`;
+
+console.log(`Client User ID: ${userId}`);
 
 const connectionStatus = document.getElementById('connection-status');
 const logContainer = document.getElementById('log-container');
@@ -16,15 +21,14 @@ function logMessage(message, type = 'info') {
 
   p.textContent = `[${timestamp}] ${message}`;
 
-  if (type === 'error') {
-    p.className = 'text-sm text-red-600';
-  } else if (type === 'success') {
-    p.className = 'text-sm text-green-600';
-  } else {
-    p.className = 'text-sm text-gray-800';
-  }
+  const colorClasses = {
+    error: 'text-sm text-red-600',
+    success: 'text-sm text-green-600',
+    info: 'text-sm text-gray-800',
+    system: 'text-sm text-blue-600'
+  };
+  p.className = colorClasses[type] || colorClasses['info'];
 
-  // 초기 메시지 제거
   if (logContainer.childElementCount === 1 && logContainer.firstChild.textContent.includes('수신된 이벤트')) {
     logContainer.innerHTML = '';
   }
@@ -39,23 +43,20 @@ function updateStatusUI(currentStatus) {
   statuses.forEach((status, index) => {
     const element = document.getElementById(`status-${status}`);
     element.classList.remove('active', 'completed');
-
     if (status === currentStatus) {
       element.classList.add('active');
       currentStatusIndex = index;
     }
   });
 
-  // 이전 단계들은 'completed'로 표시
   for (let i = 0; i < currentStatusIndex; i++) {
     const element = document.getElementById(`status-${statuses[i]}`);
     element.classList.add('completed');
   }
 
-  // 프로그레스 바 업데이트
   let progressPercentage = 0;
   if (currentStatusIndex >= 0) {
-    if (currentStatusIndex === statuses.length - 1) { // 배달 완료
+    if (currentStatusIndex === statuses.length - 1) {
       progressPercentage = 100;
       progressBar.classList.remove('bg-blue-600');
       progressBar.classList.add('bg-green-500');
@@ -68,43 +69,38 @@ function updateStatusUI(currentStatus) {
   progressBar.style.width = `${progressPercentage}%`;
 }
 
-
-// EventSource 연결 설정
+// --- EventSource 설정 ---
 const eventSource = new EventSource(SSE_ENDPOINT);
 
-// 연결 성공 시
 eventSource.onopen = function() {
-  connectionStatus.textContent = '✅ 서버에 성공적으로 연결되었습니다.';
+  connectionStatus.textContent = `✅ 서버에 연결되었습니다 (ID: ${userId})`;
   connectionStatus.className = 'text-sm text-green-600 font-semibold';
-  logMessage('SSE 연결이 시작되었습니다.', 'success');
+  logMessage('SSE 스트림 연결 성공.', 'success');
 };
 
-// 서버로부터 메시지 수신 시 (기본 'message' 이벤트)
 eventSource.onmessage = function(event) {
-  const statusData = event.data;
-  logMessage(`수신된 데이터: ${statusData}`);
-
-  if (statuses.includes(statusData)) {
-    updateStatusUI(statusData);
-  } else {
-    logMessage(`알 수 없는 상태 값: ${statusData}`, 'error');
+  const data = JSON.parse(event.data);
+  switch (data.type) {
+    case 'CONNECT':
+      logMessage(`서버 연결 완료: ${data.payload}`, 'success');
+      break;
+    case 'STATUS_UPDATE':
+      logMessage(`주문 상태 변경: ${data.payload}`);
+      updateStatusUI(data.payload);
+      break;
+    case 'HEARTBEAT':
+      logMessage(`서버 heartbeat: ${data.payload}`, 'system');
+      break;
+    default:
+      logMessage(`수신된 '${data.type}' 이벤트: ${JSON.stringify(data.payload)}`);
+      break;
   }
 };
 
-// 'customEvent'라는 이름의 커스텀 이벤트 수신 시 (연습용)
-eventSource.addEventListener('customEvent', function(event) {
-  const eventData = JSON.parse(event.data);
-  logMessage(`커스텀 이벤트 '${event.type}' 수신: ${JSON.stringify(eventData)}`);
-});
-
-// 연결 오류 발생 시
 eventSource.onerror = function(err) {
   connectionStatus.textContent = '❌ 서버 연결이 끊어졌습니다. 재연결을 시도합니다...';
   connectionStatus.className = 'text-sm text-red-600 font-semibold';
-  logMessage('SSE 연결 오류가 발생했습니다. 5초 후 재연결됩니다.', 'error');
-  // EventSource는 자동으로 5초 정도 후에 재연결을 시도합니다.
-  // 필요하다면 여기서 eventSource.close()를 호출하여 재연결을 막을 수 있습니다.
+  logMessage('SSE 연결 오류 발생. 자동 재연결됩니다.', 'error');
 };
 
-// 초기 상태 설정
 updateStatusUI('');

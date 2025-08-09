@@ -22,6 +22,14 @@ dependencies {
 
     // Spring Boot Test 스타터: JUnit 5, Mockito 등 테스트에 필요한 라이브러리를 포함합니다.
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    // 스프링 데이터 jpa 사용
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // H2 데이터베이스 드라이버: 별도의 DB 설치 없이 사용할 수 있는 인메모리 데이터베이스
+    runtimeOnly 'com.h2database:h2'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
 }
 
 test {
